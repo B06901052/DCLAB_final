@@ -4,7 +4,7 @@
 *.tcl
 *.qsys
 *.sopcinfo
-*.txt
+PLLJ_PLLSPE_INFO.txt
 *.sdc
 *.pdf
 *.qws
@@ -18,3 +18,8 @@ Rsa*
 /qsys
 /src/AI_python
 /src/img
+INCA_libs
+nWaveLog
+*.fsdb
+*.log
+novas*
