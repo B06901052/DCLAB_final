@@ -1,6 +1,6 @@
 # TRDB-LTM
 ## touch panel
-S A2~A0 MODE SER/DFR_b PD1~0
+S A2\~A0 MODE SER/DFR_b PD1\~0
 * S=1
   * start
 * A2~0=
