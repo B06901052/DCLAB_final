@@ -8,4 +8,4 @@ Imgs: ImgSender.sv ./tb/ImgSender_tb.sv
 
 .PHONY:clean
 clean:
-	rm -rf *.log *.fsdb INCA_libs
+	rm -rf *.log *.fsdb INCA_libs nWaveLog
