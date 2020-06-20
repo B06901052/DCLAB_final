@@ -1,5 +1,5 @@
-timeunit		1ns;
-timeprecision	1ns;
+timeunit		10ns;
+timeprecision	10ns;
 
 module ImgSender #(
 	parameter HEIGHT	= 480,
