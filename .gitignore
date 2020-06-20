@@ -19,7 +19,6 @@ Aud*
 I2c*
 Rsa*
 # software
-src/AI_python
 src/img
 # nWave
 INCA_libs
