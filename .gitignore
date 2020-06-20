@@ -1,3 +1,4 @@
+# quartus
 *.qpf
 *.qsf
 *.bak
@@ -6,18 +7,21 @@
 *.sopcinfo
 PLLJ_PLLSPE_INFO.txt
 *.sdc
-*.pdf
 *.qws
+.qsys_edit
+db
+incremental_db
+output_files
+qsys
+# reference
+*.pdf
 Aud*
 I2c*
 Rsa*
-/.qsys_edit
-/db
-/incremental_db
-/output_files
-/qsys
-/src/AI_python
-/src/img
+# software
+src/AI_python
+src/img
+# nWave
 INCA_libs
 nWaveLog
 *.fsdb
