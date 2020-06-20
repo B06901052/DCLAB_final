@@ -10,7 +10,12 @@ module Controller (
 	input 		i_prestep,
 	input [2:0]	i_row,
 	input [2:0]	i_col,
-	input		i_player_done
+	input		i_player_done,
+	output[1:0]	o_board [0:7][0:7],
+	//for testbench
+	output[2:0]	o_row,
+	output[2:0]	o_col,
+	output		o_aidone
 );
 
 /*================================================================*
@@ -25,7 +30,7 @@ localparam S_CHECK		= 4;
  * REG/WIRE
  *================================================================*/
 //control
-logic [2:0]	state;
+logic [2:0]	state_r, state_w;
 logic 		corder_r, corder_w;	//current order
 logic		porder_r, porder_w;	//player order
 logic		enai_r, enai_w;		//enable ai
@@ -44,19 +49,63 @@ wire		ai_done;
 wire [1:0]	ai_board [0:7][0:7];
 //updater
 wire [4:0]	up_flip;
+wire [2:0]	up_row, up_col;
 wire [1:0]	up_board [0:7][0:7];
 wire		up_start, up_done, up_fin;
 
 integer si, sj, ci, cj;
+//for testbench
+genvar i, j;
 /*================================================================*
  * ASSIGN
  *================================================================*/
-assign up_start	= (state == S_AI) ? ai2up_start : up_start_r;
-assign up_row	= (state == S_AI) ? ai2up_row : i_row;
-assign up_col	= (state == S_AI) ? ai2up_col : i_col;
+assign up_start	= (state_r == S_AI) ? ai2up_start : up_start_r;
+assign up_row	= (state_r == S_AI) ? ai2up_row : i_row;
+assign up_col	= (state_r == S_AI) ? ai2up_col : i_col;
+// for testbench
+for (i = 0; i < 8; i = i + 1) begin
+	for (j = 0; j< 8 ; j = j + 1)
+		assign o_board[i][j] = board_r[i][j];
+end
+assign o_row	= ai2up_row;
+assign o_col	= ai2up_col;
+assign o_aidone = ai_done;
 /*================================================================* 
  * Combination
  *================================================================*/
+// state
+always_comb begin
+	state_w	= state_r;
+	case (state_r)
+	S_IDLE: begin
+		if (i_start)
+			state_w	= (~&i_mode && random_r) ? S_AI : S_YOU;
+	end
+	S_AI: begin
+		if (ai_done)
+			state_w	= S_CHECK;
+	end
+	S_YOU: begin
+		if (i_player_done)
+			state_w	= S_UPDATE;
+	end
+	S_UPDATE: begin
+		if (up_done)
+			state_w	= (|up_flip) ? S_CHECK : S_YOU;
+	end
+	S_CHECK: begin
+		if (up_done) begin
+			if (|up_flip) begin
+				if (enai_r & (corder_r^porder_r))
+					state_w	= S_AI;
+				else
+					state_w	= S_YOU;
+			end else if (&count_r)
+				state_w		= S_IDLE;
+		end
+	end
+	endcase
+end
 // control
 always_comb begin
 	corder_w	= corder_r;
@@ -68,12 +117,12 @@ always_comb begin
 	count_w		= count_r;
 	fin_w		= 0;
 
-	case (state)
+	case (state_r)
 	S_IDLE: begin
 		if (i_start) begin
 			corder_w	= 0;
 			porder_w	= random_r;
-			enai_w		= ~&i_mode;
+			enai_w		= ~& i_mode;
 			if (enai_w && porder_w)
 				ai_start_w	= 1;
 		end
@@ -137,7 +186,7 @@ always_comb begin
 				pre_board_w[ci][cj] = 2;
 		end		
 	end
-	case (state)
+	case (state_r)
 	S_IDLE: begin
 		if (i_start) begin
 			board_w[3][3]		= 0;
@@ -168,7 +217,7 @@ end
 always_ff @(posedge i_clk or negedge i_rst_n) begin
 	if (!i_rst_n) begin
 		//Control
-		state		<= S_IDLE;
+		state_r		<= S_IDLE;
 		corder_r	<= 0;
 		porder_r	<= 0;
 		enai_r		<= 0;
@@ -184,40 +233,23 @@ always_ff @(posedge i_clk or negedge i_rst_n) begin
 				pre_board_r[si][sj]	<= 2;
 			end
 		end
-		//updater
-
-
 	end else begin
-		case (state)
-		S_IDLE:
-			state	<= (i_start) ? ((~&i_mode && random_r) ? S_AI : S_YOU) : state;
-		S_AI:
-			state	<= (ai_done) ? S_CHECK : state;
-		S_YOU:
-			state	<= (i_player_done) ? S_UPDATE : state;
-		S_UPDATE:
-			state	<= (up_done) ? ((|up_flip) ? S_CHECK : S_YOU) : state;
-		S_CHECK: begin
-			if (up_done) begin
-				if (|up_flip) begin
-					if (enai_r & (corder_r^porder_r)) begin
-						state	<= S_AI;
-					end else begin
-						state	<= S_YOU;
-					end
-				end else if (&count_r) begin
-					state		<= S_IDLE;
-				end else
-					state		<= state;
-			end else
-				state			<= state;
-		end
-		endcase
-		random_r		<= random_w;
+		//control
+		state_r		<= state_w;
+		corder_r	<= corder_w;
 		porder_r	<= porder_w;
+		enai_r		<= enai_w;
+		random_r	<= 1;//FIXME: random_w;
+		ai_start_r	<= ai_start_w;
+		up_start_r	<= up_start_w;
+		count_r		<= count_w;
+		fin_r		<= fin_w;
+		//board
 		for (si = 0; si < 8; si = si + 1) begin
-			for (sj = 0; sj < 8; sj = sj + 1)
-				board_r[si][sj]	<= board_w[si][sj];
+			for (sj = 0; sj < 8; sj = sj + 1) begin
+				board_r[si][sj]		<= board_w[si][sj];
+				pre_board_r[si][sj]	<= pre_board_w[si][sj];
+			end
 		end
 	end
 end
