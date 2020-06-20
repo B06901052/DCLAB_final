@@ -1,7 +1,10 @@
 timeunit		10ns;
 timeprecision	10ns;
 
-module Controller (
+module Controller #(
+	parameter WHITE = 0,
+	parameter BLACK = 1
+)(
 	input		i_clk,
 	input		i_rst_n,
 	input [1:0] i_mode,//0~2:1P easy, normal, hard; 3:2P
@@ -15,7 +18,8 @@ module Controller (
 	//for testbench
 	output[2:0]	o_row,
 	output[2:0]	o_col,
-	output		o_aidone
+	output		o_aidone,
+	output[2:0] o_state
 );
 
 /*================================================================*
@@ -51,7 +55,7 @@ wire [1:0]	ai_board [0:7][0:7];
 wire [4:0]	up_flip;
 wire [2:0]	up_row, up_col;
 wire [1:0]	up_board [0:7][0:7];
-wire		up_start, up_done, up_fin;
+wire		up_start, up_done;
 
 integer si, sj, ci, cj;
 //for testbench
@@ -60,8 +64,8 @@ genvar i, j;
  * ASSIGN
  *================================================================*/
 assign up_start	= (state_r == S_AI) ? ai2up_start : up_start_r;
-assign up_row	= (state_r == S_AI) ? ai2up_row : i_row;
-assign up_col	= (state_r == S_AI) ? ai2up_col : i_col;
+assign up_row	= (state_r == S_AI) ? ai2up_row : ((state_r == S_CHECK) ? count_r[2:0] : i_row);
+assign up_col	= (state_r == S_AI) ? ai2up_col : ((state_r == S_CHECK) ? count_r[5:3] : i_col);
 // for testbench
 for (i = 0; i < 8; i = i + 1) begin
 	for (j = 0; j< 8 ; j = j + 1)
@@ -70,41 +74,46 @@ end
 assign o_row	= ai2up_row;
 assign o_col	= ai2up_col;
 assign o_aidone = ai_done;
+assign o_state	= state_r;
 /*================================================================* 
  * Combination
  *================================================================*/
 // state
 always_comb begin
 	state_w	= state_r;
-	case (state_r)
-	S_IDLE: begin
-		if (i_start)
-			state_w	= (~&i_mode && random_r) ? S_AI : S_YOU;
-	end
-	S_AI: begin
-		if (ai_done)
-			state_w	= S_CHECK;
-	end
-	S_YOU: begin
-		if (i_player_done)
-			state_w	= S_UPDATE;
-	end
-	S_UPDATE: begin
-		if (up_done)
-			state_w	= (|up_flip) ? S_CHECK : S_YOU;
-	end
-	S_CHECK: begin
-		if (up_done) begin
-			if (|up_flip) begin
-				if (enai_r & (corder_r^porder_r))
-					state_w	= S_AI;
-				else
-					state_w	= S_YOU;
-			end else if (&count_r)
-				state_w		= S_IDLE;
+	if (i_surrender) begin
+		state_w	= S_IDLE;
+	end else begin
+		case (state_r)
+		S_IDLE: begin
+			if (i_start)
+				state_w	= (~&i_mode && ~random_r) ? S_AI : S_YOU;
 		end
+		S_AI: begin
+			if (ai_done)
+				state_w	= S_CHECK;
+		end
+		S_YOU: begin
+			if (i_player_done)
+				state_w	= S_UPDATE;
+		end
+		S_UPDATE: begin
+			if (up_done)
+				state_w	= (|up_flip) ? S_CHECK : S_YOU;
+		end
+		S_CHECK: begin
+			if (up_done) begin
+				if (|up_flip) begin
+					if (enai_r & (corder_r^porder_r))
+						state_w	= S_AI;
+					else
+						state_w	= S_YOU;
+				end else if (&count_r)
+					state_w		= S_IDLE;
+			end
+		end
+		endcase
 	end
-	endcase
 end
 // control
 always_comb begin
@@ -120,10 +129,10 @@ always_comb begin
 	case (state_r)
 	S_IDLE: begin
 		if (i_start) begin
-			corder_w	= 0;
+			corder_w	= 1;
 			porder_w	= random_r;
 			enai_w		= ~& i_mode;
-			if (enai_w && porder_w)
+			if (enai_w && ~porder_w)
 				ai_start_w	= 1;
 		end
 	end
@@ -149,11 +158,13 @@ always_comb begin
 		if (up_done) begin
 			count_w	= count_r + 1;
 			if (&count_r && ~|up_flip)
-				fin_w	= 1;
-			if (count_r == 7'b011_1111)
-				corder_w= ~corder_r;
+				fin_w		= 1;
+			if (~|up_flip)
+				up_start_w	= 1;
+			if (count_r == 7'b011_1111 && ~|up_flip)
+				corder_w	= ~corder_r;
 			if (&{(|up_flip), enai_r, (corder_r^porder_r)})
-					ai_start_w	= 1;
+				ai_start_w	= 1;
 		end
 	end
 	endcase
@@ -189,25 +200,30 @@ always_comb begin
 	case (state_r)
 	S_IDLE: begin
 		if (i_start) begin
-			board_w[3][3]		= 0;
-			board_w[4][4]		= 0;
-			board_w[3][4]		= 1;
-			board_w[4][3]		= 1;
-			pre_board_w[3][3]	= 0;
-			pre_board_w[4][4]	= 0;
-			pre_board_w[3][4]	= 1;
-			pre_board_w[4][3]	= 1;
+			board_w[3][3]		= WHITE;
+			board_w[4][4]		= WHITE;
+			board_w[3][4]		= BLACK;
+			board_w[4][3]		= BLACK;
+			pre_board_w[3][3]	= WHITE;
+			pre_board_w[4][4]	= WHITE;
+			pre_board_w[3][4]	= BLACK;
+			pre_board_w[4][3]	= BLACK;
 		end
 	end
+	S_YOU: begin
+		if (i_prestep)
+			assign_board(pre_board_r);
+	end
 	S_UPDATE: begin
-		if (up_done && |up_flip)
+		if (up_done && |up_flip) begin
 			assign_board(up_board);
-			assign_board(board_r);
+			assign_pre_board(board_r);
+		end
 	end
 	S_AI: begin
 		if (ai_done)
 			assign_board(ai_board);
-			assign_board(board_r);
+			assign_pre_board(board_r);
 	end
 	endcase
 end
@@ -218,7 +234,7 @@ always_ff @(posedge i_clk or negedge i_rst_n) begin
 	if (!i_rst_n) begin
 		//Control
 		state_r		<= S_IDLE;
-		corder_r	<= 0;
+		corder_r	<= 1;
 		porder_r	<= 0;
 		enai_r		<= 0;
 		random_r	<= 0;
@@ -239,7 +255,7 @@ always_ff @(posedge i_clk or negedge i_rst_n) begin
 		corder_r	<= corder_w;
 		porder_r	<= porder_w;
 		enai_r		<= enai_w;
-		random_r	<= 1;//FIXME: random_w;
+		random_r	<= random_w;
 		ai_start_r	<= ai_start_w;
 		up_start_r	<= up_start_w;
 		count_r		<= count_w;

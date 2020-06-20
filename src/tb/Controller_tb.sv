@@ -7,13 +7,14 @@ module Controller_tb;
  *================================================================*/
 localparam CLK		= 20;
 localparam HCLK		= CLK/2;
-localparam MAX_CLK	= 100_0000;
+localparam MAX_CLK	= 800_0000;
 
 /*================================================================*
  * REG/WIRE
  *================================================================*/
 logic clk, rst_n;
 logic start, ai_done, player_done;
+logic [2:0] ctrl_state;
 logic [2:0] ai_row, ai_col, player_row, player_col;
 integer file, corder, row, col, d, e;
 
@@ -29,7 +30,7 @@ initial begin
 		$fsdbDumpvars(0, Controller_tb, "+mda");
 	`endif
 
-	file = $fopen("./AI_python/dump/5_tsai.csv", "r");//filename == who is first
+	file = $fopen("./AI_python/dump/05_24_23_12_39.csv", "r");//filename == who is first
 	assert (file) 
 	else begin
 		$display("filepath is wrong");
@@ -49,12 +50,13 @@ initial begin
 
 	while (!$feof(file)) begin
 		$fscanf(file, "%d,%d,%d,%d,%d", corder, row, col, d, e);
-		if (corder == -2) begin
+		if (corder == 1) begin
 			wait(ai_done);
+			$display("\n(%1d,%1d)", ai_row, ai_col);
 			assert (row==ai_row && col==ai_col) 
 			else begin 
 				$display("error at (%2d,%1d,%1d,%2d,%2d)", corder, row, col, d, e);
-				$display("\n(%1d,%1d)", ai_row, ai_col);
+				#(100*CLK)
 				$fclose(file);
 				$finish;
 			end
@@ -62,10 +64,8 @@ initial begin
 			#(2*CLK)
 			player_row	= row;
 			player_col	= col;
-			#(2*CLK)
-			player_done	= 1;
-			#(CLK)
-			player_done	= 0;
+			#(4000*CLK)	player_done	= 1;
+			#(CLK) 		player_done	= 0;
 		end
 		
 	end

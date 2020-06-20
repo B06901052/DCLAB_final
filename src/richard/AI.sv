@@ -125,8 +125,8 @@ assign current_weight=weight[row_r][col_r];
 //assign o_max_col=max_col_r;
 assign random =counter_r%max_num_r;
 assign o_max_grade=max_score_r;
-assign o_max_row=(max_num_r>0)?(max_row_array_r[0]):0;//FIXME: index is random
-assign o_max_col=(max_num_r>0)?(max_col_array_r[0]):0;//FIXME: index is random
+assign o_max_row=(max_num_r>0)?(max_row_array_r[random]):0;
+assign o_max_col=(max_num_r>0)?(max_col_array_r[random]):0;
 integer q,r;
 always_comb begin
     for (q=0;q<8;q=q+1) begin
