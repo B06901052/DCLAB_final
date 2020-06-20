@@ -3,7 +3,11 @@ timeprecision	1ns;
 
 module ImgSender #(
 	parameter HEIGHT	= 480,
-	parameter WIDTH		= 800
+	parameter WIDTH		= 800,
+	parameter XOFFSET	= 40,
+	parameter YOFFSET	= 40,
+	parameter BLOCK		= 50,
+	parameter MARGIN	= 8
 )(
 	input			i_clk,
 	input			i_rst_n,
@@ -16,14 +20,6 @@ module ImgSender #(
 	input	[8:0]	i_y,
 	output 	[23:0]	o_pixel
 );
-/*================================================================*
- * LOCALPARAM
- *================================================================*/
-localparam	BLOCK	= 50;
-localparam	XOFFSET	= 40;
-localparam	YOFFSET	= 40;
-localparam	MARGIN	= 4;
-
 /*================================================================*
  * REG/WIRE
  *================================================================*/
@@ -58,11 +54,11 @@ always_ff @(posedge i_clk or negedge i_rst_n) begin
 		xf_r		<= XOFFSET + BLOCK - MARGIN;
 		yi_r		<= YOFFSET + MARGIN;
 		yf_r		<= YOFFSET + BLOCK - MARGIN;
-		///other
-		x_r			<= 0;
-		pixel_r		<= '1;
-		buffer_r	<= '1;
-		count_r		<= 0;
+		///img
+		x_r			<= 0;	//pre_x_position
+		pixel_r		<= '1;	//RGB
+		buffer_r	<= '1;	//store R
+		count_r		<= 0;	//count whether buffer is prepared
 		//board
 		col_r		<= 0;
 		row_r		<= 0;
@@ -94,7 +90,8 @@ end
 
 /*================================================================* 
  * Combination
- *================================================================*/ 
+ *================================================================*/
+//img
 always_comb begin
 	x_w			= i_x + 1;
 	count_w		= x_r[0] ^ i_x[0];

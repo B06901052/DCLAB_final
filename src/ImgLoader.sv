@@ -33,17 +33,18 @@ localparam RX_OK_BIT   = 7;
 //FSM
 localparam S_IDLE		= 0;//receive 
 localparam S_LOAD		= 1;
+localparam S_SEND		= 2;
 
 /*================================================================*
  * REG/WIRE
  *================================================================*/
-logic			state_r, fin_r, fin_w;
-logic [31:0]	avm_writedata_r;
+logic [1:0]		state;
+logic			fin_r, fin_w;
 logic [4:0] 	avm_address_r, avm_address_w;
 logic			avm_read_r, avm_read_w, avm_write_r, avm_write_w;
 logic [15:0]	data_r, data_w;
 logic [19:0]	addr_r, addr_w;
-logic [20:0]	counter_r, counter_w;
+logic 			count_r, count_w;
 
 
 /*================================================================*
@@ -52,17 +53,15 @@ logic [20:0]	counter_r, counter_w;
 assign avm_address  = avm_address_r;
 assign avm_read     = avm_read_r;
 assign avm_write    = avm_write_r;
-assign avm_writedata= avm_writedata_r;
+assign avm_writedata= {24'b0, data_r[15:8]};
 assign o_data		= data_r;
 assign o_address	= addr_r;
 
 /*================================================================* 
  * Combination
  *================================================================*/
+//avm
 always_comb begin
-	data_w			= data_r;
-	counter_w		= counter_r;
-	addr_w			= addr_r;
 	avm_address_w	= avm_address_r;
 	avm_read_w		= avm_read_r;
 	avm_write_w		= avm_write_r;
@@ -79,38 +78,52 @@ always_comb begin
 		end
 	end
 	default: begin
-		if ((state_r == S_LOAD) && avm_readdata[RX_OK_BIT] && !avm_waitrequest) begin
+		if (&{(state == S_LOAD), avm_readdata[RX_OK_BIT], !avm_waitrequest}) begin
 			avm_address_w	= RX_BASE;
-		end else if (state_r == S_SEND && avm_readdata[TX_OK_BIT] && !avm_waitrequest) begin
+		end else if (&{(state == S_SEND), avm_readdata[TX_OK_BIT], (!avm_waitrequest)}) begin
 			avm_read_w		= 0;
 			avm_write_w		= 1;
 			avm_address_w	= TX_BASE;
+		end else begin
+			avm_address_w	= STATUS_BASE;
 		end
 	end
 	endcase
-	case(state_r)
+end
+
+//data IO
+always_comb begin
+	data_w			= data_r;
+	count_w			= count_r;
+	addr_w			= addr_r;
+	case(state)
 	S_IDLE: begin
-	if (i_start) begin
-		data_w			= 0;
-		counter_w		= 0;
-		addr_w			= 0;
-		avm_address_w	= STATUS_BASE;
+		if (i_start) begin
+			data_w	= 0;
+			count_w	= 0;
+			addr_w	= 0;
+		end
 	end
 	S_LOAD: begin
+		if (addr_r[0] ~^ count_w) begin
+			addr_w	= addr_r + 1;
+		end
+		if (avm_address_r == RX_BASE && !avm_waitrequest) begin
+			if (addr_r[0]) begin
+				data_w	= {data_w[7:0], avm_readdata[7:0]};
+				count_w	= ~count_r;
+			end else begin
+				data_w	= {8'b0, avm_readdata[7:0]};
+			end
+		end
 	end
 	S_SEND: begin
+		if (avm_address_r == TX_BASE && !avm_waitrequest) begin
+			count_w	= ~count_r;
+			data_w	= {data_r[7:0], 8'b0};
+		end		
 	end
-	end if (state_r) begin
-		avm_address_w	= ((avm_address_r == RX_BASE && avm_waitrequest) || 
-						   (avm_readdata[RX_OK_BIT] && !avm_waitrequest)) ? RX_BASE : STATUS_BASE;
-		if (avm_address_r == RX_BASE && !avm_waitrequest) begin
-			counter_w	= counter_r + 1;
-			data_w	= {data_r[7:0], avm_readdata[7:0]};
-		end
-		if (counter_r[1]) begin
-			addr_w		= addr_r + 1;
-		end
-	end
+	endcase
 end
 
 /*================================================================*
@@ -118,19 +131,22 @@ end
  *================================================================*/ 
 always_ff @(posedge avm_clk or posedge avm_rst) begin
 	if (avm_rst) begin
-		data_r        <= 0;
-		counter_r		<= 0;
+		data_r			<= 0;
+		count_r			<= 0;
 		addr_r			<= 0;
-		avm_address_r   <= STATUS_BASE;
-		state_r         <= S_IDLE;
+		avm_address_r	<= STATUS_BASE;
+		avm_read_r		<= 1;
+		avm_write_r		<= 0;
+		state			<= S_IDLE;
 	end else begin
-		data_r        <= data_w;
-		counter_r		<= counter_w;
+		data_r			<= data_w;
+		count_r			<= count_w;
 		addr_r			<= addr_w;
-		avm_address_r   <= avm_address_w;
-		case(state_r)
-		S_IDLE: state_r	<= (i_start) ? S_LOAD : S_IDLE;
-		S_LOAD: state_r <= (fin_r)	 ? S_IDLE : S_LOAD;
+		avm_address_r	<= avm_address_w;
+		case(state)
+		S_IDLE: state	<= (i_start)	? S_LOAD : state;
+		S_LOAD: state	<= (count_r)	? S_SEND : state;
+		S_SEND: state	<= (|addr_r)	? S_IDLE : ((count_r) ? S_LOAD : state);
 		endcase
 	end
 end
