@@ -133,33 +133,14 @@ always_comb begin
         for (r=0;r<8;r=r+1) begin
             up_board[q][r]=i_upboard[q][r];
         end
-    end/*
-    for (q=0;q<8;q=q+1) begin
-        for (r=0;r<8;r=r+1) begin
-            o_board_r[q][r]=board_r[q][r];
-        end
     end
-    */
 end
 assign up_flip=i_flip;
 assign up_done=i_done;
 assign o_up_start=up_start;
 assign o_row=row_r;
 assign o_col=col_r;
-/*
-updater upAI(
-  .i_clk(i_clk),
-  .i_rst_n(i_rst_n),
-  .i_start(up_start),
-  .i_color(color_r),
-  .i_row(row_r),
-  .i_col(col_r),
-  .i_current_board(board_r),
-    .o_updated_board(up_board),
-  .o_flip(up_flip),
-  .o_done(up_done)
-) ;
-*/
+
 integer i,j,k,m;
 always_comb begin
     row_w=row_r;
@@ -184,9 +165,6 @@ always_comb begin
             o_updated_board[i][j]=board_r[i][j];
         end
     end
-    //for (i=0;i<64;i=i+1) begin
-    //    max_score_array_w[i]=max_score_array_r[i];
-    //end
     for (i=0;i<64;i=i+1) begin
         max_row_array_w[i]=max_row_array_r[i];
     end
@@ -321,14 +299,12 @@ always_comb begin
                         max_score_w=current_weight+up_flip;
                         max_row_w=row_r;
                         max_col_w=col_r;
-                        //max_score_array_w[0]=current_weight+up_flip;
                         max_row_array_w[0]=row_r;
                         max_col_array_w[0]=col_r;
                         max_num_w=1;
                         update_max=1;
                     end
                     else if(current_weight+up_flip==max_score_r) begin
-                        //max_score_array_w[max_num_r]=current_weight+up_flip;
                         max_row_array_w[max_num_r]=row_r;
                         max_col_array_w[max_num_r]=col_r;
                         max_num_w=max_num_r+1;
@@ -470,9 +446,6 @@ always_ff @(posedge i_clk or negedge i_rst_n) begin
                 board_r[k][m]<=0;
             end
         end
-        //for(k=0;k<64;k++) begin
-        //    max_score_array_r[k]<=0;
-        //end
         for(k=0;k<64;k++) begin
             max_row_array_r[k]<=0;
         end
@@ -493,9 +466,6 @@ always_ff @(posedge i_clk or negedge i_rst_n) begin
                 board_r[k][m]<=board_w[k][m];
             end
         end
-       // for(k=0;k<64;k++) begin
-        //    max_score_array_r[k]<=max_score_array_w[k];
-        //end
         for(k=0;k<64;k++) begin
             max_row_array_r[k]<=max_row_array_w[k];
         end
